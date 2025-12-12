@@ -274,23 +274,9 @@ async function getAstarModule() {
 }
 
 async function solveWithWasm() {
+  const n = N;
+  const size = n * n;
 
-console.log("Calling _solve with:", {
-  n,
-  start,
-  goal,
-  wallsPtr,
-  outPtr,
-  size
-});
-  
-console.log("WASM loaded. exports:", {
-  solve: typeof AstarModule._solve,
-  malloc: typeof AstarModule._malloc,
-  free: typeof AstarModule._free,
-});
-
-  
   let AstarModule;
   try {
     AstarModule = await getAstarModule();
@@ -300,9 +286,6 @@ console.log("WASM loaded. exports:", {
     return;
   }
 
-  const n = N;
-  const size = n * n;
-
   const wallsArr = new Int32Array(size);
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
@@ -311,7 +294,8 @@ console.log("WASM loaded. exports:", {
   }
 
   const wallsPtr = AstarModule._malloc(wallsArr.byteLength);
-  AstarModule.HEAP32.set(wallsArr, wallsPtr >> 2);
+  const HEAP32 = AstarModule.HEAP32; // pages.ymlでHEAP32をexport済み
+  HEAP32.set(wallsArr, wallsPtr >> 2);
 
   const outPtr = AstarModule._malloc(size * 4);
 
@@ -326,15 +310,14 @@ console.log("WASM loaded. exports:", {
 
   solvedPath = null;
   finished = true;
-  clearSearchVisuals(); // show only path for wasm solve
+  clearSearchVisuals();
 
   if (len > 0) {
-    const HEAP32 = AstarModule.HEAP32 || AstarModule.HEAP32View;
-    HEAP32.set(wallsArr, wallsPtr >> 2);
+    const out = HEAP32.subarray(outPtr >> 2, (outPtr >> 2) + len);
     solvedPath = Array.from(out, idx => {
-      const r = Math.floor(idx / n);
-      const c = idx % n;
-      return `${r},${c}`;
+      const rr = Math.floor(idx / n);
+      const cc = idx % n;
+      return `${rr},${cc}`;
     });
     renderStatus(`Solved by WASM! path_len=${len}`);
   } else {
@@ -346,6 +329,7 @@ console.log("WASM loaded. exports:", {
 
   paintAll();
 }
+
 
 // ---------- buttons wiring ----------
 if (!solveBtn || !stepBtn || !clearPathBtn || !clearWallsBtn || !resetAllBtn) {
