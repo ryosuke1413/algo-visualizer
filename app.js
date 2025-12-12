@@ -68,6 +68,8 @@ function paintAll() {
     cell.classList.toggle("start", r === start.r && c === start.c);
     cell.classList.toggle("goal",  r === goal.r  && c === goal.c);
     cell.classList.toggle("wall",  walls.has(k));
+    // after adding open/closed/path, re-apply start/goal/wall classes
+    // (or keep CSS !important instead)
   });
 
   // overlay search visuals if any
