@@ -32,3 +32,7 @@ button { padding: 8px 12px; cursor: pointer; }
 .cell.open { background: #eef3ff; }
 .cell.closed { background: #dfe8ff; }
 .cell.path { background: #2f6fff; }
+/* Force priority for key cell states */
+.cell.wall  { background: #222 !important; border-color: #222 !important; }
+.cell.start { background: #2a8f2a !important; }
+.cell.goal  { background: #c63b3b !important; }
