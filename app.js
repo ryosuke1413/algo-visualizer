@@ -364,3 +364,30 @@ solveBtn.onclick = async () => {
 
 // init
 rebuildGrid();
+
+// ===== Button wiring (force) =====
+const solveBtn = document.getElementById("solve");
+const stepBtn = document.getElementById("step");
+const clearPathBtn = document.getElementById("clearPath");
+
+if (!solveBtn || !stepBtn || !clearPathBtn) {
+  console.error("Button not found:", { solveBtn, stepBtn, clearPathBtn });
+}
+
+// Solve = WASM
+solveBtn.onclick = async () => {
+  await solveWithWasm();
+};
+
+// Step = JS step (visualization)
+stepBtn.onclick = () => {
+  stepSearch();
+  paintAll();
+};
+
+// ClearPath = reset only path/search visuals (keep walls)
+clearPathBtn.onclick = () => {
+  resetSearch();
+  paintAll();
+  renderStatus("Ready");
+};
