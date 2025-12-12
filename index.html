@@ -1,11 +1,29 @@
 <!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Algo Visualizer</title>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <h1>Algo Visualizer</h1>
-    <p>GitHub Pages is working.</p>
+    <p>Step 5: Click cells to toggle walls. Shift+Click sets Start, Alt(Option)+Click sets Goal.</p>
+
+    <div class="toolbar">
+      <button id="clearWalls">Clear Walls</button>
+      <button id="resetAll">Reset All</button>
+      <span id="status"></span>
+    </div>
+
+    <div id="grid" aria-label="grid"></div>
+
+    <div class="legend">
+      <span class="badge"><span class="dot start"></span>Start</span>
+      <span class="badge"><span class="dot goal"></span>Goal</span>
+      <span class="badge"><span class="dot wall"></span>Wall</span>
+    </div>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>
