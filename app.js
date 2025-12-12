@@ -1,6 +1,17 @@
-import createAstarModule from "./wasm/astar.js";
-const AstarModule = await createAstarModule();
-console.log("WASM add(3,4) =", AstarModule._add(3,4));
+let AstarModulePromise = null;
+
+async function getAstarModule() {
+  if (!AstarModulePromise) {
+    // Solveを押した時に初めて読み込む
+    AstarModulePromise = import("./wasm/astar.js")
+      .then(m => m.default()) // default export = createModule
+      .catch(err => {
+        AstarModulePromise = null;
+        throw err;
+      });
+  }
+  return AstarModulePromise;
+}
 
 const N = 20;
 const gridEl = document.getElementById("grid");
@@ -282,6 +293,16 @@ function solveAll() {
 }
 
 function solveWithWasm() {
+  async function solveWithWasm() {
+  let AstarModule;
+  try {
+    AstarModule = await getAstarModule();
+  } catch (e) {
+    console.error(e);
+    renderStatus("WASM load failed (see Console)");
+    return;
+  }
+
   // 初期化（探索色など）は消して、経路だけ表示
   initSearch();      // open/closedの状態は初期化だけに使う（任意）
   clearSearchVisuals();
@@ -295,6 +316,7 @@ function solveWithWasm() {
     for (let c = 0; c < n; c++) {
       wallsArr[r*n + c] = walls.has(`${r},${c}`) ? 1 : 0;
     }
+  }
   }
 
   // wasm heap に確保
@@ -352,8 +374,8 @@ stepBtn.onclick = () => {
   paintAll();
 };
 
-solveBtn.onclick = () => {
-  solveWithWasm();
+solveBtn.onclick = async () => {
+  await solveWithWasm();
 };
 
 // init
