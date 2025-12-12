@@ -274,6 +274,23 @@ async function getAstarModule() {
 }
 
 async function solveWithWasm() {
+
+console.log("Calling _solve with:", {
+  n,
+  start,
+  goal,
+  wallsPtr,
+  outPtr,
+  size
+});
+  
+console.log("WASM loaded. exports:", {
+  solve: typeof AstarModule._solve,
+  malloc: typeof AstarModule._malloc,
+  free: typeof AstarModule._free,
+});
+
+  
   let AstarModule;
   try {
     AstarModule = await getAstarModule();
