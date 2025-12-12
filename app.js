@@ -1,17 +1,14 @@
+// ===== WASM loader (lazy) =====
 let AstarModulePromise = null;
 
 async function getAstarModule() {
   if (!AstarModulePromise) {
-    // Solveを押した時に初めて読み込む
     AstarModulePromise = import("./wasm/astar.js")
-      .then(m => m.default()) // default export = createModule
-      .catch(err => {
-        AstarModulePromise = null;
-        throw err;
-      });
+      .then(m => m.default());
   }
   return AstarModulePromise;
 }
+
 
 const N = 20;
 const gridEl = document.getElementById("grid");
@@ -292,54 +289,47 @@ function solveAll() {
   paintAll();
 }
 
-function solveWithWasm() {
-  async function solveWithWasm() {
+async function solveWithWasm() {
   let AstarModule;
   try {
     AstarModule = await getAstarModule();
   } catch (e) {
     console.error(e);
-    renderStatus("WASM load failed (see Console)");
+    renderStatus("WASM load failed");
     return;
   }
-
-  // 初期化（探索色など）は消して、経路だけ表示
-  initSearch();      // open/closedの状態は初期化だけに使う（任意）
-  clearSearchVisuals();
 
   const n = N;
   const size = n * n;
 
-  // walls を 0/1 の Int32 配列にする
+  // walls -> Int32Array
   const wallsArr = new Int32Array(size);
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       wallsArr[r*n + c] = walls.has(`${r},${c}`) ? 1 : 0;
     }
   }
-  }
 
-  // wasm heap に確保
-  const wallsBytes = wallsArr.byteLength;
-  const wallsPtr = AstarModule._malloc(wallsBytes);
+  // malloc
+  const wallsPtr = AstarModule._malloc(wallsArr.byteLength);
   AstarModule.HEAP32.set(wallsArr, wallsPtr >> 2);
 
-  // 経路バッファ（最大 n*n）
-  const maxLen = size;
-  const outPtr = AstarModule._malloc(maxLen * 4);
+  const outPtr = AstarModule._malloc(size * 4);
 
-  const sr = start.r, sc = start.c;
-  const gr = goal.r,  gc = goal.c;
+  const len = AstarModule._solve(
+    n,
+    start.r, start.c,
+    goal.r,  goal.c,
+    wallsPtr,
+    outPtr,
+    size
+  );
 
-  const len = AstarModule._solve(n, sr, sc, gr, gc, wallsPtr, outPtr, maxLen);
-
-  // 読み出し
   solvedPath = null;
   finished = true;
 
   if (len > 0) {
     const out = AstarModule.HEAP32.subarray(outPtr >> 2, (outPtr >> 2) + len);
-    // JS側の表示形式（"r,c"）に変換
     solvedPath = Array.from(out, idx => {
       const r = Math.floor(idx / n);
       const c = idx % n;
@@ -350,7 +340,6 @@ function solveWithWasm() {
     renderStatus("No path (WASM)");
   }
 
-  // 解放
   AstarModule._free(wallsPtr);
   AstarModule._free(outPtr);
 
@@ -368,11 +357,6 @@ function resetSearch() {
   finished = false;
   clearSearchVisuals();
 }
-
-stepBtn.onclick = () => {
-  stepSearch();
-  paintAll();
-};
 
 solveBtn.onclick = async () => {
   await solveWithWasm();
