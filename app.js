@@ -9,7 +9,6 @@ async function getAstarModule() {
   return AstarModulePromise;
 }
 
-
 const N = 20;
 const gridEl = document.getElementById("grid");
 const statusEl = document.getElementById("status");
