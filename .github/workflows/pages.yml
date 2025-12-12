@@ -1,0 +1,48 @@
+name: Build and Deploy (Wasm)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Verify emcc
+        run: emcc -v
+
+      - name: Build wasm
+        run: |
+          mkdir -p dist/wasm
+          emcc wasm/astar.c -O2 \
+            -s MODULARIZE=1 -s EXPORT_ES6=1 \
+            -s EXPORTED_FUNCTIONS="['_add']" \
+            -o dist/wasm/astar.js
+          cp index.html style.css app.js dist/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
