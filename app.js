@@ -280,6 +280,60 @@ function solveAll() {
   paintAll();
 }
 
+function solveWithWasm() {
+  // 初期化（探索色など）は消して、経路だけ表示
+  initSearch();      // open/closedの状態は初期化だけに使う（任意）
+  clearSearchVisuals();
+
+  const n = N;
+  const size = n * n;
+
+  // walls を 0/1 の Int32 配列にする
+  const wallsArr = new Int32Array(size);
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      wallsArr[r*n + c] = walls.has(`${r},${c}`) ? 1 : 0;
+    }
+  }
+
+  // wasm heap に確保
+  const wallsBytes = wallsArr.byteLength;
+  const wallsPtr = AstarModule._malloc(wallsBytes);
+  AstarModule.HEAP32.set(wallsArr, wallsPtr >> 2);
+
+  // 経路バッファ（最大 n*n）
+  const maxLen = size;
+  const outPtr = AstarModule._malloc(maxLen * 4);
+
+  const sr = start.r, sc = start.c;
+  const gr = goal.r,  gc = goal.c;
+
+  const len = AstarModule._solve(n, sr, sc, gr, gc, wallsPtr, outPtr, maxLen);
+
+  // 読み出し
+  solvedPath = null;
+  finished = true;
+
+  if (len > 0) {
+    const out = AstarModule.HEAP32.subarray(outPtr >> 2, (outPtr >> 2) + len);
+    // JS側の表示形式（"r,c"）に変換
+    solvedPath = Array.from(out, idx => {
+      const r = Math.floor(idx / n);
+      const c = idx % n;
+      return `${r},${c}`;
+    });
+    renderStatus(`Solved by WASM! path_len=${len}`);
+  } else {
+    renderStatus("No path (WASM)");
+  }
+
+  // 解放
+  AstarModule._free(wallsPtr);
+  AstarModule._free(outPtr);
+
+  paintAll();
+}
+
 function resetSearch() {
   openSet = null;
   cameFrom = null;
@@ -298,7 +352,7 @@ stepBtn.onclick = () => {
 };
 
 solveBtn.onclick = () => {
-  solveAll();
+  solveWithWasm();
 };
 
 // init
