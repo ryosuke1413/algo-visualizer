@@ -1,13 +1,9 @@
-// ===== WASM loader (lazy) =====
-let AstarModulePromise = null;
-
-async function getAstarModule() {
-  if (!AstarModulePromise) {
-    AstarModulePromise = import("./wasm/astar.js")
-      .then(m => m.default());
-  }
-  return AstarModulePromise;
-}
+// =========================
+// Grid + A* Visualizer
+// Step: JS A* (visualize open/closed)
+// Solve: WASM solver (path only)
+// ClearPath: clears search/path overlays
+// =========================
 
 const N = 20;
 const gridEl = document.getElementById("grid");
@@ -21,22 +17,24 @@ const resetAllBtn = document.getElementById("resetAll");
 
 let start = { r: 2, c: 2 };
 let goal  = { r: 17, c: 17 };
-const walls = new Set(); // "r,c"
+const walls = new Set(); // key: "r,c"
 
-// visualization state
+// --- search / viz state (JS A*) ---
 let openSet = null;     // array of node keys
-let cameFrom = null;    // Map(key -> parentKey)
-let gScore = null;      // Map(key -> number)
-let fScore = null;      // Map(key -> number)
-let openKeySet = null;  // Set for membership
-let closedSet = null;   // Set of visited
+let openKeySet = null;  // Set membership for openSet
+let closedSet = null;   // Set visited
+let cameFrom = null;    // Map(child -> parent)
+let gScore = null;      // Map(key -> cost)
+let fScore = null;      // Map(key -> cost+heuristic)
 let solvedPath = null;  // array of keys
 let finished = false;
 
+// ---------- helpers ----------
 function key(r, c) { return `${r},${c}`; }
 function parseKey(k) { const [r,c] = k.split(",").map(Number); return { r, c }; }
 function inBounds(r,c){ return r>=0 && r<N && c>=0 && c<N; }
 
+// ---------- UI ----------
 function renderStatus(extra="") {
   statusEl.textContent =
     `Start=(${start.r},${start.c})  Goal=(${goal.r},${goal.c})  Walls=${walls.size}` +
@@ -60,9 +58,7 @@ function rebuildGrid() {
 
 function clearSearchVisuals() {
   const cells = gridEl.querySelectorAll(".cell");
-  cells.forEach(cell => {
-    cell.classList.remove("open", "closed", "path");
-  });
+  cells.forEach(cell => cell.classList.remove("open", "closed", "path"));
 }
 
 function paintAll() {
@@ -75,11 +71,9 @@ function paintAll() {
     cell.classList.toggle("start", r === start.r && c === start.c);
     cell.classList.toggle("goal",  r === goal.r  && c === goal.c);
     cell.classList.toggle("wall",  walls.has(k));
-    // after adding open/closed/path, re-apply start/goal/wall classes
-    // (or keep CSS !important instead)
   });
 
-  // overlay search visuals if any
+  // overlays
   if (closedSet) {
     for (const k of closedSet) {
       const {r,c} = parseKey(k);
@@ -103,6 +97,19 @@ function paintAll() {
   }
 }
 
+function resetSearch() {
+  openSet = null;
+  openKeySet = null;
+  closedSet = null;
+  cameFrom = null;
+  gScore = null;
+  fScore = null;
+  solvedPath = null;
+  finished = false;
+  clearSearchVisuals();
+}
+
+// ---------- click controls ----------
 function setStart(r, c) {
   if (r === goal.r && c === goal.c) return;
   walls.delete(key(r,c));
@@ -111,6 +118,7 @@ function setStart(r, c) {
   paintAll();
   renderStatus("Ready");
 }
+
 function setGoal(r, c) {
   if (r === start.r && c === start.c) return;
   walls.delete(key(r,c));
@@ -119,9 +127,10 @@ function setGoal(r, c) {
   paintAll();
   renderStatus("Ready");
 }
+
 function toggleWall(r, c) {
-  const k = key(r,c);
   if ((r === start.r && c === start.c) || (r === goal.r && c === goal.c)) return;
+  const k = key(r,c);
   if (walls.has(k)) walls.delete(k);
   else walls.add(k);
   resetSearch();
@@ -129,10 +138,7 @@ function toggleWall(r, c) {
   renderStatus("Ready");
 }
 
-// Click behavior:
-// - normal click: toggle wall
-// - Shift+click: set Start
-// - Alt(Option)+click: set Goal
+// normal click=wall, Shift=Start, Alt/Option=Goal
 gridEl.addEventListener("click", (e) => {
   const cell = e.target.closest(".cell");
   if (!cell) return;
@@ -144,32 +150,10 @@ gridEl.addEventListener("click", (e) => {
   else toggleWall(r,c);
 });
 
-clearWallsBtn.onclick = () => {
-  walls.clear();
-  resetSearch();
-  paintAll();
-  renderStatus("Ready");
-};
-
-resetAllBtn.onclick = () => {
-  walls.clear();
-  start = { r: 2, c: 2 };
-  goal  = { r: 17, c: 17 };
-  resetSearch();
-  paintAll();
-  renderStatus("Ready");
-};
-
-clearPathBtn.onclick = () => {
-  resetSearch();
-  paintAll();
-  renderStatus("Ready");
-};
-
-// ---------- A* (JS version) ----------
+// ---------- JS A* (step visualization) ----------
 function heuristic(aKey, bKey) {
   const a = parseKey(aKey), b = parseKey(bKey);
-  return Math.abs(a.r - b.r) + Math.abs(a.c - b.c); // Manhattan
+  return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
 }
 
 function neighbors(k) {
@@ -228,7 +212,7 @@ function bestOpenNode() {
       bestIdx = i;
     }
   }
-  // remove from array
+
   openSet.splice(bestIdx, 1);
   openKeySet.delete(bestK);
   return bestK;
@@ -237,14 +221,13 @@ function bestOpenNode() {
 function stepSearch() {
   if (finished) return;
 
-  if (!openSet || !cameFrom) initSearch();
+  if (!openSet) initSearch();
 
-  const s = key(start.r, start.c);
   const g = key(goal.r, goal.c);
 
   if (openSet.length === 0) {
     finished = true;
-    renderStatus("No path");
+    renderStatus("No path (JS)");
     return;
   }
 
@@ -254,7 +237,7 @@ function stepSearch() {
   if (current === g) {
     solvedPath = reconstructPath(current);
     finished = true;
-    renderStatus(`Solved! path_len=${solvedPath.length}`);
+    renderStatus(`Solved (JS)! path_len=${solvedPath.length}`);
     return;
   }
 
@@ -263,7 +246,7 @@ function stepSearch() {
   for (const nb of neighbors(current)) {
     if (closedSet.has(nb)) continue;
 
-    const tentative = curG + 1; // grid cost
+    const tentative = curG + 1;
     const old = gScore.get(nb);
 
     if (old === undefined || tentative < old) {
@@ -281,11 +264,13 @@ function stepSearch() {
   renderStatus(`Open=${openSet.length} Closed=${closedSet.size}`);
 }
 
-function solveAll() {
-  initSearch();
-  // hard cap to avoid infinite loop in case of bugs
-  for (let i = 0; i < 5000 && !finished; i++) stepSearch();
-  paintAll();
+// ---------- WASM loader (lazy) ----------
+let AstarModulePromise = null;
+async function getAstarModule() {
+  if (!AstarModulePromise) {
+    AstarModulePromise = import("./wasm/astar.js").then(m => m.default());
+  }
+  return AstarModulePromise;
 }
 
 async function solveWithWasm() {
@@ -294,14 +279,13 @@ async function solveWithWasm() {
     AstarModule = await getAstarModule();
   } catch (e) {
     console.error(e);
-    renderStatus("WASM load failed");
+    renderStatus("WASM load failed (see Console)");
     return;
   }
 
   const n = N;
   const size = n * n;
 
-  // walls -> Int32Array
   const wallsArr = new Int32Array(size);
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
@@ -309,7 +293,6 @@ async function solveWithWasm() {
     }
   }
 
-  // malloc
   const wallsPtr = AstarModule._malloc(wallsArr.byteLength);
   AstarModule.HEAP32.set(wallsArr, wallsPtr >> 2);
 
@@ -326,6 +309,7 @@ async function solveWithWasm() {
 
   solvedPath = null;
   finished = true;
+  clearSearchVisuals(); // show only path for wasm solve
 
   if (len > 0) {
     const out = AstarModule.HEAP32.subarray(outPtr >> 2, (outPtr >> 2) + len);
@@ -345,48 +329,41 @@ async function solveWithWasm() {
   paintAll();
 }
 
-function resetSearch() {
-  openSet = null;
-  cameFrom = null;
-  gScore = null;
-  fScore = null;
-  openKeySet = null;
-  closedSet = null;
-  solvedPath = null;
-  finished = false;
-  clearSearchVisuals();
+// ---------- buttons wiring ----------
+if (!solveBtn || !stepBtn || !clearPathBtn || !clearWallsBtn || !resetAllBtn) {
+  console.error("Missing buttons:", { solveBtn, stepBtn, clearPathBtn, clearWallsBtn, resetAllBtn });
 }
 
 solveBtn.onclick = async () => {
   await solveWithWasm();
 };
 
-// init
-rebuildGrid();
-
-// ===== Button wiring (force) =====
-const solveBtn = document.getElementById("solve");
-const stepBtn = document.getElementById("step");
-const clearPathBtn = document.getElementById("clearPath");
-
-if (!solveBtn || !stepBtn || !clearPathBtn) {
-  console.error("Button not found:", { solveBtn, stepBtn, clearPathBtn });
-}
-
-// Solve = WASM
-solveBtn.onclick = async () => {
-  await solveWithWasm();
-};
-
-// Step = JS step (visualization)
 stepBtn.onclick = () => {
   stepSearch();
   paintAll();
 };
 
-// ClearPath = reset only path/search visuals (keep walls)
 clearPathBtn.onclick = () => {
   resetSearch();
   paintAll();
   renderStatus("Ready");
 };
+
+clearWallsBtn.onclick = () => {
+  walls.clear();
+  resetSearch();
+  paintAll();
+  renderStatus("Ready");
+};
+
+resetAllBtn.onclick = () => {
+  walls.clear();
+  start = { r: 2, c: 2 };
+  goal  = { r: 17, c: 17 };
+  resetSearch();
+  paintAll();
+  renderStatus("Ready");
+};
+
+// init
+rebuildGrid();
