@@ -2,7 +2,6 @@ import createAstarModule from "./wasm/astar.js";
 const AstarModule = await createAstarModule();
 console.log("WASM add(3,4) =", AstarModule._add(3,4));
 
-
 const N = 20;
 const gridEl = document.getElementById("grid");
 const statusEl = document.getElementById("status");
