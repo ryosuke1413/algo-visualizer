@@ -329,7 +329,8 @@ console.log("WASM loaded. exports:", {
   clearSearchVisuals(); // show only path for wasm solve
 
   if (len > 0) {
-    const out = AstarModule.HEAP32.subarray(outPtr >> 2, (outPtr >> 2) + len);
+    const HEAP32 = AstarModule.HEAP32 || AstarModule.HEAP32View;
+    HEAP32.set(wallsArr, wallsPtr >> 2);
     solvedPath = Array.from(out, idx => {
       const r = Math.floor(idx / n);
       const c = idx % n;
