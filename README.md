@@ -20,3 +20,5 @@ JS(UI) -> WASM(C solver) -> JS(rendering)
 - Performance
 - Environment-independent build via CI
 - Clear separation of concerns
+
+Memory transfer between JS and WASM is handled via exported HEAP views.
