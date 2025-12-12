@@ -11,14 +11,15 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
@@ -29,10 +30,7 @@ jobs:
       - name: Build wasm
         run: |
           mkdir -p dist/wasm
-          emcc wasm/astar.c -O2 \
-  -s MODULARIZE=1 -s EXPORT_ES6=1 \
-  -s EXPORTED_FUNCTIONS="['_solve','_malloc','_free']" \
-  -o dist/wasm/astar.js
+          emcc wasm/astar.c -O2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_FUNCTIONS='["_solve","_malloc","_free"]' -o dist/wasm/astar.js
           cp index.html style.css app.js dist/
 
       - name: Upload Pages artifact
