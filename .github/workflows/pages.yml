@@ -31,6 +31,9 @@ jobs:
         run: |
           mkdir -p dist/wasm
           emcc wasm/astar.c -O2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORTED_FUNCTIONS='["_solve","_malloc","_free"]' -s EXPORTED_RUNTIME_METHODS='["HEAP32"]' -o dist/wasm/astar.js
+          cp index.html style.css app.js dist/
+          ls -la dist
+          ls -la dist/wasm
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
