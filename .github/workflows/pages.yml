@@ -30,9 +30,9 @@ jobs:
         run: |
           mkdir -p dist/wasm
           emcc wasm/astar.c -O2 \
-            -s MODULARIZE=1 -s EXPORT_ES6=1 \
-            -s EXPORTED_FUNCTIONS="['_add']" \
-            -o dist/wasm/astar.js
+  -s MODULARIZE=1 -s EXPORT_ES6=1 \
+  -s EXPORTED_FUNCTIONS="['_solve','_malloc','_free']" \
+  -o dist/wasm/astar.js
           cp index.html style.css app.js dist/
 
       - name: Upload Pages artifact
